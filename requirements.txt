@@ -1,0 +1,7 @@
+torch>=1.7.0
+yaml
+librosa
+audiomentations
+pydub
+tqdm
+einops
