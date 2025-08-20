@@ -3,7 +3,6 @@ import torch
 from torch import optim, nn
 from torch.optim import lr_scheduler
 
-
 class WarmUpLR(lr_scheduler._LRScheduler):
 
     def __init__(self, optimizer: optim.Optimizer, total_iters: int, last_epoch: int = -1):
@@ -40,6 +39,7 @@ class LabelSmoothingLoss(nn.Module):
             true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
         return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
 
+
 def get_scheduler(optimizer: optim.Optimizer, scheduler_type: str, T_max: int) -> lr_scheduler._LRScheduler:
 
     if scheduler_type == "cosine_annealing":
@@ -48,8 +48,6 @@ def get_scheduler(optimizer: optim.Optimizer, scheduler_type: str, T_max: int) -
         raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
     return scheduler
-
-from torch import nn, optim
 
 
 def get_optimizer(net: nn.Module, opt_config: dict) -> optim.Optimizer:

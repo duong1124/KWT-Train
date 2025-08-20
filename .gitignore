@@ -1,9 +1,10 @@
 *.pyc
 *.log
 
-
 __pycache__/
 
+__init__.py
+download_gspeech_v2.sh
 get_pkl.py
 data/
 create_pkl_dataset/
