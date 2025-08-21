@@ -1,1 +1,1 @@
-from .utils import get_config
+from .train_utils import get_config

@@ -2,10 +2,10 @@ import torch
 import pickle
 import numpy as np
 import numba as nb
-import librosa
 
-from torch.utils.data import Dataset, DataLoader
-#@nb.jit(nopython=True, cache=True)
+from torch.utils.data import Dataset
+
+
 @nb.jit(nopython=True)
 def spec_augment(mel_spec: np.ndarray, n_time_masks: int, time_mask_width: int, n_freq_masks: int, freq_mask_width: int):
     offset, begin = 0, 0
@@ -88,15 +88,3 @@ def load_dataset(file_path):
         dataset = pickle.load(file)
     print(f"Dataset loaded from {file_path}.")
     return dataset
-
-
-def get_loader(dataset, config, train=True):
-  dataloader = DataLoader(
-      dataset,
-      batch_size=config["hparams"]["batch_size"],
-      num_workers=config["exp"]["n_workers"],
-      pin_memory=config["exp"]["pin_memory"],
-      shuffle=True if train else False
-  )
-
-  return dataloader

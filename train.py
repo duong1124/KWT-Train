@@ -9,9 +9,10 @@ from typing import Callable, Tuple
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from utils import log, get_config, count_params, calc_step, seed_everything
-from dataset import PrecomputedSpeechDataset, get_loader
-from train_items import get_model, get_optimizer, get_scheduler, save_model, LabelSmoothingLoss, WarmUpLR
+from kwt import kwt_from_name, KWT
+from train_utils import get_config, count_params, calc_step, seed_everything, log, save_model
+from dataset import PrecomputedSpeechDataset
+from train_items import LabelSmoothingLoss, WarmUpLR
 
 
 def train_single_batch(net: nn.Module, data: torch.Tensor, targets: torch.Tensor, optimizer: optim.Optimizer, criterion: Callable, device: torch.device) -> Tuple[float, int]:
@@ -150,11 +151,20 @@ def training_pipeline(config):
         label_map = label_map,
         train=True # for data_augment
     )
-
-    trainloader = get_loader(train_dataset, config, train=True) # for shuffle
+    trainloader = DataLoader(
+        train_dataset,
+        batch_size=config["hparams"]["batch_size"],
+        num_workers=config["exp"]["n_workers"],
+        pin_memory=config["exp"]["pin_memory"],
+        shuffle=True
+    )
 
     # model
-    model = get_model(config["hparams"]["model"])
+    if config["hparams"]["model"]["name"] is not None:
+        model =  kwt_from_name(config["hparams"]["model"]["name"])
+    else:
+        model = KWT(**config["hparams"]["model"])
+
     model = model.to(config["hparams"]["device"])
     print(f"Created model with {count_params(model)} parameters.")
 
@@ -165,7 +175,10 @@ def training_pipeline(config):
         criterion = nn.CrossEntropyLoss()
 
     # optimizer
-    optimizer = get_optimizer(model, config["hparams"]["optimizer"])
+    optimizer = optim.AdamW(
+        model.parameters(),
+        config["hparams"]["optimizer"]["opt_kwargs"]
+    )
 
     # lr scheduler
     schedulers = {
@@ -178,8 +191,11 @@ def training_pipeline(config):
 
     if config["hparams"]["scheduler"]["scheduler_type"] is not None:
         total_iters = len(trainloader) * max(1, (config["hparams"]["scheduler"]["max_epochs"] - config["hparams"]["scheduler"]["n_warmup"]))
-        schedulers["scheduler"] = get_scheduler(optimizer, config["hparams"]["scheduler"]["scheduler_type"], total_iters)
-
+        schedulers["scheduler"] = lr_scheduler.CosineAnnealingLR(
+            optimizer=optimizer,
+            T_max=total_iters,
+            eta_min=1e-8
+        )
 
     #####################################
     # Training Run
@@ -187,7 +203,7 @@ def training_pipeline(config):
     end_func_time = time.time()
     print("Initiating training.")
     print(f"Takes {end_func_time - start_func_time} seconds to start training.")
-    # train(model, optimizer, criterion, trainloader, valloader, schedulers, config) - no more val
+
     train(model, optimizer, criterion, trainloader, schedulers, config)
 
     #####################################
@@ -200,7 +216,13 @@ def training_pipeline(config):
         label_map = label_map,
         train=False
     )
-    testloader = get_loader(test_dataset, config, train=False)
+    testloader = DataLoader(
+        test_dataset,
+        batch_size=config["hparams"]["batch_size"],
+        num_workers=config["exp"]["n_workers"],
+        pin_memory=config["exp"]["pin_memory"],
+        shuffle=False
+    )
     final_step = calc_step(config["hparams"]["n_epochs"] + 1, len(trainloader), len(trainloader) - 1)
 
     # evaluating the final state (last.pth)

@@ -16,6 +16,7 @@ def get_config(config_file: str) -> dict:
 
     return base_config
 
+
 def seed_everything(seed: str) -> None:
 
     random.seed(seed)
@@ -48,3 +49,22 @@ def log(log_dict: dict, step: int, config: dict) -> None:
     # show logs in stdout
     if config["exp"]["log_to_stdout"]:
         print(log_message)
+
+
+def save_model(epoch: int, val_acc: float, save_path: str, net: nn.Module, optimizer : optim.Optimizer = None, log_file : str = None) -> None:
+
+    ckpt_dict = {
+        "epoch": epoch,
+        "val_acc": val_acc,
+        "model_state_dict": net.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict() if optimizer is not None else optimizer
+    }
+
+    torch.save(ckpt_dict, save_path)
+
+    log_message = f"Saved {save_path} with accuracy {val_acc}."
+    print(log_message)
+
+    if log_file is not None:
+        with open(log_file, "a+") as f:
+            f.write(log_message + "\n")
