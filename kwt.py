@@ -1,10 +1,9 @@
 import torch
 import torch.fft
-import torch.nn.functional as F
-from torch import nn, einsum
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
+from torch import nn, einsum
 
 
 # Basically vision transformer, ViT that accepts MFCC + SpecAug. Refer to:
