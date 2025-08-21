@@ -1,26 +1,48 @@
 import pickle
-
+import librosa
 import numba as nb
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
 
-@nb.jit(nopython=True)
-def spec_augment(mel_spec: np.ndarray, n_time_masks: int, time_mask_width: int, n_freq_masks: int, freq_mask_width: int):
-    offset, begin = 0, 0
+class GoogleSpeechDataset(Dataset):
+    """Dataset wrapper for Google Speech Commands V2 to save, since output is in numpy array."""
 
-    for _ in range(n_time_masks):
-        offset = np.random.randint(0, time_mask_width)
-        begin = np.random.randint(0, mel_spec.shape[1] - offset)
-        mel_spec[:, begin: begin + offset] = 0.0
+    def __init__(self, data_list: list, audio_settings: dict, label_map: dict = None):
+        super().__init__()
 
-    for _ in range(n_freq_masks):
-        offset = np.random.randint(0, freq_mask_width)
-        begin = np.random.randint(0, mel_spec.shape[0] - offset)
-        mel_spec[begin: begin + offset, :] = 0.0
+        self.data_list = data_list
+        self.audio_settings = audio_settings
 
-    return mel_spec
+        # labels: if no label map is provided, will not load labels. (Use for inference)
+        if label_map is not None:
+            self.label_list = []
+            label_2_idx = {v: int(k) for k, v in label_map.items()}
+            for path in data_list:
+                # Store the integer index instead of the string label
+                self.label_list.append(label_2_idx[path.split("/")[-2]])
+        else:
+            self.label_list = None
+
+
+    def __len__(self):
+        return len(self.data_list)
+
+
+    def __getitem__(self, idx):
+        x = librosa.load(self.data_list[idx], sr=self.audio_settings["sr"])[0]
+
+        # this will return MFCC for saved .pkl file (in numpy array)
+        x = librosa.util.fix_length(x, size=self.audio_settings["sr"])
+        x = librosa.feature.melspectrogram(y=x, **self.audio_settings)
+        x = librosa.feature.mfcc(S=librosa.power_to_db(x), n_mfcc=self.audio_settings["n_mels"])
+
+        if self.label_list is not None:
+            label = self.label_list[idx]
+            return x, label
+        else:
+            return x
 
 
 class PrecomputedSpeechDataset(Dataset):
@@ -88,3 +110,20 @@ def load_dataset(file_path):
         dataset = pickle.load(file)
     print(f"Dataset loaded from {file_path}.")
     return dataset
+
+
+@nb.jit(nopython=True)
+def spec_augment(mel_spec: np.ndarray, n_time_masks: int, time_mask_width: int, n_freq_masks: int, freq_mask_width: int):
+    offset, begin = 0, 0
+
+    for _ in range(n_time_masks):
+        offset = np.random.randint(0, time_mask_width)
+        begin = np.random.randint(0, mel_spec.shape[1] - offset)
+        mel_spec[:, begin: begin + offset] = 0.0
+
+    for _ in range(n_freq_masks):
+        offset = np.random.randint(0, freq_mask_width)
+        begin = np.random.randint(0, mel_spec.shape[0] - offset)
+        mel_spec[begin: begin + offset, :] = 0.0
+
+    return mel_spec

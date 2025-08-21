@@ -7,11 +7,12 @@ import time
 from torch import nn, optim
 from typing import Callable, Tuple
 from torch.utils.data import DataLoader
+from torch.optim import lr_scheduler
 from tqdm import tqdm
 
 from kwt import kwt_from_name, KWT
 from train_utils import get_config, count_params, calc_step, seed_everything, log, save_model
-from dataset import PrecomputedSpeechDataset
+from dataset import PrecomputedSpeechDataset, GoogleSpeechDataset
 from train_items import LabelSmoothingLoss, WarmUpLR
 
 
@@ -177,7 +178,7 @@ def training_pipeline(config):
     # optimizer
     optimizer = optim.AdamW(
         model.parameters(),
-        config["hparams"]["optimizer"]["opt_kwargs"]
+        **config["hparams"]["optimizer"]["opt_kwargs"]
     )
 
     # lr scheduler
